@@ -72,14 +72,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Lynx" },
+      { name: "description", content: "Lince Guide is an interactive 3D animated guide that helps users navigate and understand platform data." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Lynx" },
+      { property: "og:description", content: "Lince Guide is an interactive 3D animated guide that helps users navigate and understand platform data." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Lynx" },
+      { name: "twitter:description", content: "Lince Guide is an interactive 3D animated guide that helps users navigate and understand platform data." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/0ac957e3-b74f-4568-8431-ea93f7d80da2/id-preview-dea3fc3b--c49bf06a-a2a7-4fed-a339-560f996d518f.lovable.app-1780068010683.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/0ac957e3-b74f-4568-8431-ea93f7d80da2/id-preview-dea3fc3b--c49bf06a-a2a7-4fed-a339-560f996d518f.lovable.app-1780068010683.png" },
     ],
     links: [
       {
