@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import type { Group } from "three";
+import { Box3, Group, Vector3 } from "three";
 import {
   PRESETS,
   blendTransforms,
@@ -16,6 +16,8 @@ interface LynxModelProps {
 }
 
 const BLEND_DURATION = 0.25;
+/** Target world-space height for the lynx, regardless of the source GLB scale. */
+const TARGET_HEIGHT = 1.4;
 
 export function LynxModel({
   preset,
@@ -24,6 +26,24 @@ export function LynxModel({
 }: LynxModelProps) {
   const { scene } = useGLTF(modelUrl);
   const groupRef = useRef<Group>(null);
+
+  // Compute auto-fit transform once per model: center it on origin and scale
+  // so its height matches TARGET_HEIGHT. This makes the component work with any
+  // GLB regardless of original units/orientation.
+  const fit = useMemo(() => {
+    const box = new Box3().setFromObject(scene);
+    const size = new Vector3();
+    const center = new Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const scale = TARGET_HEIGHT / maxDim;
+    return {
+      // Recenter on X/Z, drop on Y so feet sit at y=0
+      offset: [-center.x, -box.min.y, -center.z] as [number, number, number],
+      scale,
+    };
+  }, [scene]);
 
   // Track elapsed time for the current preset and for blending.
   const presetStartRef = useRef(0);
@@ -75,12 +95,16 @@ export function LynxModel({
     const g = groupRef.current;
     g.position.set(target.position[0], target.position[1], target.position[2]);
     g.rotation.set(target.rotation[0], target.rotation[1], target.rotation[2]);
-    g.scale.setScalar(target.scale);
+    g.scale.setScalar(target.scale * fit.scale);
   });
 
   return (
     <group ref={groupRef}>
-      <primitive object={scene} />
+      {/* Inner offset group recenters the source mesh so the outer animated
+          group can rotate/translate around the model's own pivot. */}
+      <group position={fit.offset}>
+        <primitive object={scene} />
+      </group>
     </group>
   );
 }
