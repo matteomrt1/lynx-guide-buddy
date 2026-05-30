@@ -16,7 +16,7 @@ export function LynxCanvas({
 }: LynxCanvasProps) {
   return (
     <Canvas
-      camera={{ position: [0, 0.6, 3.2], fov: 35 }}
+      camera={{ position: [0, 0.9, 3.0], fov: 30 }}
       gl={{ alpha: true, antialias: true }}
       style={{ background: "transparent", pointerEvents: "none" }}
     >
