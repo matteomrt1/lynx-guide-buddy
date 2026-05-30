@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react' // o il plugin che stai usando
+import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  plugins: [react()],
-  base: '/lynx-guide-buddy/', // SOSTITUISCI con il nome esatto del tuo repository su GitHub
-})
+  tanstackStart: {
+    server: { entry: "server" },
+  },
+});
