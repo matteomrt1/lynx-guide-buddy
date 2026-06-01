@@ -127,39 +127,39 @@ const walkPat: PresetFn = ({ time }) => {
   let bob = 0;
   let roll = 0;
   let nod = 0;
-  let yaw = Math.PI / 2;
+  let yaw = 0;
   let stretchY = 1;
   if (t < 0.45) {
     const wt = t / 0.45;
     x = -1.0 + easeInOutCubic(wt) * 2.0;
-    bob = Math.abs(Math.sin(wt * Math.PI * 8)) * 0.18; // hopping trot
-    roll = Math.sin(wt * Math.PI * 8) * 0.18;
+    bob = Math.abs(Math.sin(wt * Math.PI * 8)) * 0.18;
+    roll = Math.sin(wt * Math.PI * 8) * 0.12;
+    yaw = MAX_YAW * 0.85;
     stretchY = 1 + Math.sin(wt * Math.PI * 8) * 0.08;
   } else if (t < 0.65) {
-    // pat
     const pt = (t - 0.45) / 0.2;
     x = 1.0;
     const k = Math.sin(pt * Math.PI);
+    yaw = MAX_YAW * 0.85 * (1 - k);
     nod = k * 0.45;
     bob = -k * 0.1;
     stretchY = 1 - k * 0.12;
   } else if (t < 0.95) {
-    // trot back
     const wt = (t - 0.65) / 0.3;
     x = 1.0 - easeInOutCubic(wt) * 2.0;
     bob = Math.abs(Math.sin(wt * Math.PI * 8)) * 0.15;
-    roll = -Math.sin(wt * Math.PI * 8) * 0.18;
-    yaw = -Math.PI / 2;
+    roll = -Math.sin(wt * Math.PI * 8) * 0.12;
+    yaw = -MAX_YAW * 0.85;
     stretchY = 1 + Math.sin(wt * Math.PI * 8) * 0.07;
   } else {
     x = -1.0;
-    yaw = -Math.PI / 2;
+    yaw = -MAX_YAW * 0.85;
   }
   const edgeFade =
     t > 0.97 ? 1 - (t - 0.97) / 0.03 : t < 0.03 ? t / 0.03 : 1;
   return {
     position: [x, bob, 0],
-    rotation: [nod, yaw, roll],
+    rotation: [nod, faceCamera(yaw), roll],
     scale: [edgeFade, edgeFade * stretchY, edgeFade],
   };
 };
@@ -193,20 +193,20 @@ const leapAcross: PresetFn = ({
   }
   return {
     position: [x, arc, 0],
-    rotation: [pitch, Math.PI / 2, 0],
+    rotation: [pitch, faceCamera(MAX_YAW * 0.9), 0],
     scale: [sx, sy, sz],
   };
 };
 
 // 5. Module filters — crouched radar: ear scan + tail twitch + breathing.
 const crouchRadar: PresetFn = ({ time }) => {
-  const scan = Math.sin(time * 1.6) * 0.35; // head yaw scan
+  const scan = Math.sin(time * 1.6) * MAX_YAW * 0.85;
   const step = Math.floor(time / 0.22);
   const twitch = ((step % 2) - 0.5) * 0.14; // tail roll
   const breathe = Math.sin(time * 2.2) * 0.04;
   return {
     position: [0, -0.18 + breathe, 0],
-    rotation: [0.12, scan, twitch],
+    rotation: [0.12, faceCamera(scan), twitch],
     scale: [0.95, 0.9 + breathe, 0.95],
   };
 };
@@ -220,7 +220,7 @@ const guardSit: PresetFn = ({ time }) => {
   const perk = cycle < 0.12 ? Math.sin((cycle / 0.12) * Math.PI) * 0.08 : 0;
   return {
     position: [0, breathe, 0],
-    rotation: [-perk * 0.5, sway, 0],
+    rotation: [-perk * 0.5, faceCamera(sway), 0],
     scale: [1, 1 + breathe + perk, 1],
   };
 };
