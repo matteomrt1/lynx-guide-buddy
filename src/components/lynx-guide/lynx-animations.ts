@@ -70,27 +70,52 @@ const entranceSit: PresetFn = ({ time }) => {
   };
 };
 
-// 2. Search — peek up from below, sniff side-to-side, occasional paw tap.
+// 2. Search — peek around the edges of the module window: right, left, then bottom.
+// Head always angled toward the centre so the face stays visible.
 const peekTap: PresetFn = ({ time }) => {
-  const peek = clamp01(time / 0.55);
-  const y = -0.95 + easeOutCubic(peek) * 0.95;
-  // Side-to-side sniff (head yaw)
-  const sniff = time > 0.55 ? Math.sin((time - 0.55) * 3.0) * 0.35 : 0;
-  // Tap every 1.4s after settling
-  let nod = 0;
-  let squashY = 1;
-  if (time > 0.8) {
-    const cycle = ((time - 0.8) % 1.4) / 1.4;
-    if (cycle < 0.22) {
-      const k = Math.sin((cycle / 0.22) * Math.PI);
-      nod = k * 0.4;
-      squashY = 1 - k * 0.1;
+  const cycle = 4.2;
+  const t = (time % cycle) / cycle;
+  let x = 0, y = 0, yaw = 0, nod = 0, tilt = 0;
+  let sx = 1, sy = 1, sz = 1;
+  if (t < 0.33) {
+    // peek in from the right edge
+    const k = Math.sin((t / 0.33) * Math.PI);
+    x = 1.15 - k * 0.55;
+    y = 0.55;
+    yaw = -0.5 + k * 0.25;
+    tilt = -0.2;
+    nod = -0.08 * k;
+    sx = 1 - k * 0.05;
+  } else if (t < 0.66) {
+    // peek in from the left edge
+    const lt = (t - 0.33) / 0.33;
+    const k = Math.sin(lt * Math.PI);
+    x = -1.15 + k * 0.55;
+    y = 0.55;
+    yaw = 0.5 - k * 0.25;
+    tilt = 0.2;
+    nod = -0.08 * k;
+    sx = 1 - k * 0.05;
+  } else {
+    // pop up from the bottom + paw tap
+    const lt = (t - 0.66) / 0.34;
+    const k = easeOutCubic(clamp01(lt * 1.8));
+    x = 0;
+    y = -1.0 + k * 0.95;
+    yaw = Math.sin(lt * Math.PI * 2) * 0.3;
+    nod = 0.18 - k * 0.12;
+    if (lt > 0.55) {
+      const pt = (lt - 0.55) / 0.45;
+      const pk = Math.sin(pt * Math.PI);
+      nod += pk * 0.35;
+      sy = 1 - pk * 0.12;
+      sx = 1 + pk * 0.08;
     }
   }
   return {
-    position: [0, y, 0],
-    rotation: [nod, sniff, 0],
-    scale: [1, squashY, 1],
+    position: [x, y, 0],
+    rotation: [nod, faceCamera(yaw), tilt],
+    scale: [sx, sy, sz],
   };
 };
 
