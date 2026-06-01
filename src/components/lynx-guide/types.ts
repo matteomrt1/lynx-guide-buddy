@@ -49,5 +49,6 @@ export const STEP_TO_PRESET: Record<LynxStep, LynxPreset> = {
 export interface LynxTransform {
   position: [number, number, number];
   rotation: [number, number, number];
-  scale: number;
+  /** Per-axis scale to allow squash & stretch. */
+  scale: [number, number, number];
 }
