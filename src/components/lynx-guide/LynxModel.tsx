@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
-import { Box3, Group, Vector3 } from "three";
+import { useAnimations, useGLTF } from "@react-three/drei";
+import { Box3, Group, LoopRepeat, Vector3 } from "three";
 import {
   PRESETS,
   blendTransforms,
@@ -19,13 +19,63 @@ const BLEND_DURATION = 0.25;
 /** Target world-space height for the lynx, regardless of the source GLB scale. */
 const TARGET_HEIGHT = 1.4;
 
+const PRESET_CLIP_HINTS: Record<LynxPreset, string[]> = {
+  "entrance-sit": ["sit", "idle"],
+  "peek-tap": ["idle", "look", "sniff", "alert"],
+  "walk-pat": ["walk", "trot", "run"],
+  "leap-across": ["jump", "leap", "run", "gallop"],
+  "crouch-radar": ["crouch", "stalk", "prowl", "idle"],
+  "guard-sit": ["sit", "idle"],
+};
+
 export function LynxModel({
   preset,
   modelUrl,
   onAutoAdvanceComplete,
 }: LynxModelProps) {
-  const { scene } = useGLTF(modelUrl);
+  const { scene, animations } = useGLTF(modelUrl);
   const groupRef = useRef<Group>(null);
+  const innerRef = useRef<Group>(null);
+  const { actions, names } = useAnimations(animations, innerRef);
+
+  // Log clip names once for debugging the available animations in the GLB.
+  useEffect(() => {
+    if (names.length) {
+      // eslint-disable-next-line no-console
+      console.info("[LynxGuide] GLB animation clips:", names);
+    } else {
+      // eslint-disable-next-line no-console
+      console.info("[LynxGuide] GLB has no animation clips — using procedural motion only.");
+    }
+  }, [names]);
+
+  // Pick the best matching clip for the current preset.
+  const currentClipRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!names.length) return;
+    const hints = PRESET_CLIP_HINTS[preset];
+    const lower = names.map((n) => n.toLowerCase());
+    let pick: string | null = null;
+    for (const h of hints) {
+      const idx = lower.findIndex((n) => n.includes(h));
+      if (idx !== -1) {
+        pick = names[idx];
+        break;
+      }
+    }
+    if (!pick) pick = names[0];
+
+    const prev = currentClipRef.current;
+    if (prev && prev !== pick && actions[prev]) {
+      actions[prev]!.fadeOut(0.25);
+    }
+    const next = actions[pick];
+    if (next) {
+      next.reset().setLoop(LoopRepeat, Infinity).fadeIn(0.25).play();
+      next.timeScale = 1;
+    }
+    currentClipRef.current = pick;
+  }, [preset, actions, names]);
 
   // Compute auto-fit transform once per model: center it on origin and scale
   // so its height matches TARGET_HEIGHT. This makes the component work with any
@@ -95,14 +145,18 @@ export function LynxModel({
     const g = groupRef.current;
     g.position.set(target.position[0], target.position[1], target.position[2]);
     g.rotation.set(target.rotation[0], target.rotation[1], target.rotation[2]);
-    g.scale.setScalar(target.scale * fit.scale);
+    g.scale.set(
+      target.scale[0] * fit.scale,
+      target.scale[1] * fit.scale,
+      target.scale[2] * fit.scale,
+    );
   });
 
   return (
     <group ref={groupRef}>
       {/* Inner offset group recenters the source mesh so the outer animated
           group can rotate/translate around the model's own pivot. */}
-      <group position={fit.offset}>
+      <group ref={innerRef} position={fit.offset}>
         <primitive object={scene} />
       </group>
     </group>
