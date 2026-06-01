@@ -33,29 +33,31 @@ export interface PresetContext {
 
 export type PresetFn = (ctx: PresetContext) => LynxTransform;
 
-// 1. Welcome — two playful hops in, then breathing + head wiggle.
+// Keep face visible: clamp yaw so the back never faces the camera.
+// Camera is at +Z; yaw=0 faces camera. Allow ~±60° (3/4 view) max.
+const MAX_YAW = Math.PI / 3;
+const faceCamera = (yaw: number) => Math.max(-MAX_YAW, Math.min(MAX_YAW, yaw));
+
+// 1. Welcome — two playful hops in, then head tilt + breathing, always facing camera.
 const entranceSit: PresetFn = ({ time }) => {
   const enter = clamp01(time / 0.6);
   const popIn = easeOutElastic(enter);
-  // Two bounces: 0..0.45s first hop, 0.45..0.85s smaller hop
   let y = 0;
   let stretchY = 1;
   if (time < 0.45) {
     const t = time / 0.45;
     y = -0.5 + Math.sin(t * Math.PI) * 0.7;
-    stretchY = 1 + Math.sin(t * Math.PI) * 0.15; // stretch in air
+    stretchY = 1 + Math.sin(t * Math.PI) * 0.15;
   } else if (time < 0.85) {
     const t = (time - 0.45) / 0.4;
     y = Math.sin(t * Math.PI) * 0.35;
     stretchY = 1 + Math.sin(t * Math.PI) * 0.08;
   } else {
-    // breathing
     stretchY = 1 + Math.sin((time - 0.85) * 3.2) * 0.05;
   }
-  // Head wiggle after landing
-  const wiggle = time > 0.85 ? Math.sin((time - 0.85) * 2.4) * 0.18 : 0;
+  const wiggle = time > 0.85 ? Math.sin((time - 0.85) * 2.4) * 0.35 : 0;
+  const tilt = time > 0.85 ? Math.sin((time - 0.85) * 1.7) * 0.12 : 0;
   const breathe = time > 0.85 ? Math.sin((time - 0.85) * 1.8) * 0.04 : 0;
-  // Landing squash
   const landImpulse =
     time > 0.4 && time < 0.55 ? Math.sin(((time - 0.4) / 0.15) * Math.PI) : 0;
   const sx = popIn * (1 + landImpulse * 0.15);
@@ -63,32 +65,57 @@ const entranceSit: PresetFn = ({ time }) => {
   const sz = popIn * (1 + landImpulse * 0.15);
   return {
     position: [0, y + breathe, 0],
-    rotation: [0, wiggle, 0],
+    rotation: [0, faceCamera(wiggle), tilt],
     scale: [sx, sy, sz],
   };
 };
 
-// 2. Search — peek up from below, sniff side-to-side, occasional paw tap.
+// 2. Search — peek around the edges of the module window: right, left, then bottom.
+// Head always angled toward the centre so the face stays visible.
 const peekTap: PresetFn = ({ time }) => {
-  const peek = clamp01(time / 0.55);
-  const y = -0.95 + easeOutCubic(peek) * 0.95;
-  // Side-to-side sniff (head yaw)
-  const sniff = time > 0.55 ? Math.sin((time - 0.55) * 3.0) * 0.35 : 0;
-  // Tap every 1.4s after settling
-  let nod = 0;
-  let squashY = 1;
-  if (time > 0.8) {
-    const cycle = ((time - 0.8) % 1.4) / 1.4;
-    if (cycle < 0.22) {
-      const k = Math.sin((cycle / 0.22) * Math.PI);
-      nod = k * 0.4;
-      squashY = 1 - k * 0.1;
+  const cycle = 4.2;
+  const t = (time % cycle) / cycle;
+  let x = 0, y = 0, yaw = 0, nod = 0, tilt = 0;
+  let sx = 1, sy = 1, sz = 1;
+  if (t < 0.33) {
+    // peek in from the right edge
+    const k = Math.sin((t / 0.33) * Math.PI);
+    x = 1.15 - k * 0.55;
+    y = 0.55;
+    yaw = -0.5 + k * 0.25;
+    tilt = -0.2;
+    nod = -0.08 * k;
+    sx = 1 - k * 0.05;
+  } else if (t < 0.66) {
+    // peek in from the left edge
+    const lt = (t - 0.33) / 0.33;
+    const k = Math.sin(lt * Math.PI);
+    x = -1.15 + k * 0.55;
+    y = 0.55;
+    yaw = 0.5 - k * 0.25;
+    tilt = 0.2;
+    nod = -0.08 * k;
+    sx = 1 - k * 0.05;
+  } else {
+    // pop up from the bottom + paw tap
+    const lt = (t - 0.66) / 0.34;
+    const k = easeOutCubic(clamp01(lt * 1.8));
+    x = 0;
+    y = -1.0 + k * 0.95;
+    yaw = Math.sin(lt * Math.PI * 2) * 0.3;
+    nod = 0.18 - k * 0.12;
+    if (lt > 0.55) {
+      const pt = (lt - 0.55) / 0.45;
+      const pk = Math.sin(pt * Math.PI);
+      nod += pk * 0.35;
+      sy = 1 - pk * 0.12;
+      sx = 1 + pk * 0.08;
     }
   }
   return {
-    position: [0, y, 0],
-    rotation: [nod, sniff, 0],
-    scale: [1, squashY, 1],
+    position: [x, y, 0],
+    rotation: [nod, faceCamera(yaw), tilt],
+    scale: [sx, sy, sz],
   };
 };
 
@@ -100,39 +127,39 @@ const walkPat: PresetFn = ({ time }) => {
   let bob = 0;
   let roll = 0;
   let nod = 0;
-  let yaw = Math.PI / 2;
+  let yaw = 0;
   let stretchY = 1;
   if (t < 0.45) {
     const wt = t / 0.45;
     x = -1.0 + easeInOutCubic(wt) * 2.0;
-    bob = Math.abs(Math.sin(wt * Math.PI * 8)) * 0.18; // hopping trot
-    roll = Math.sin(wt * Math.PI * 8) * 0.18;
+    bob = Math.abs(Math.sin(wt * Math.PI * 8)) * 0.18;
+    roll = Math.sin(wt * Math.PI * 8) * 0.12;
+    yaw = MAX_YAW * 0.85;
     stretchY = 1 + Math.sin(wt * Math.PI * 8) * 0.08;
   } else if (t < 0.65) {
-    // pat
     const pt = (t - 0.45) / 0.2;
     x = 1.0;
     const k = Math.sin(pt * Math.PI);
+    yaw = MAX_YAW * 0.85 * (1 - k);
     nod = k * 0.45;
     bob = -k * 0.1;
     stretchY = 1 - k * 0.12;
   } else if (t < 0.95) {
-    // trot back
     const wt = (t - 0.65) / 0.3;
     x = 1.0 - easeInOutCubic(wt) * 2.0;
     bob = Math.abs(Math.sin(wt * Math.PI * 8)) * 0.15;
-    roll = -Math.sin(wt * Math.PI * 8) * 0.18;
-    yaw = -Math.PI / 2;
+    roll = -Math.sin(wt * Math.PI * 8) * 0.12;
+    yaw = -MAX_YAW * 0.85;
     stretchY = 1 + Math.sin(wt * Math.PI * 8) * 0.07;
   } else {
     x = -1.0;
-    yaw = -Math.PI / 2;
+    yaw = -MAX_YAW * 0.85;
   }
   const edgeFade =
     t > 0.97 ? 1 - (t - 0.97) / 0.03 : t < 0.03 ? t / 0.03 : 1;
   return {
     position: [x, bob, 0],
-    rotation: [nod, yaw, roll],
+    rotation: [nod, faceCamera(yaw), roll],
     scale: [edgeFade, edgeFade * stretchY, edgeFade],
   };
 };
@@ -166,20 +193,20 @@ const leapAcross: PresetFn = ({
   }
   return {
     position: [x, arc, 0],
-    rotation: [pitch, Math.PI / 2, 0],
+    rotation: [pitch, faceCamera(MAX_YAW * 0.9), 0],
     scale: [sx, sy, sz],
   };
 };
 
 // 5. Module filters — crouched radar: ear scan + tail twitch + breathing.
 const crouchRadar: PresetFn = ({ time }) => {
-  const scan = Math.sin(time * 1.6) * 0.35; // head yaw scan
+  const scan = Math.sin(time * 1.6) * MAX_YAW * 0.85;
   const step = Math.floor(time / 0.22);
   const twitch = ((step % 2) - 0.5) * 0.14; // tail roll
   const breathe = Math.sin(time * 2.2) * 0.04;
   return {
     position: [0, -0.18 + breathe, 0],
-    rotation: [0.12, scan, twitch],
+    rotation: [0.12, faceCamera(scan), twitch],
     scale: [0.95, 0.9 + breathe, 0.95],
   };
 };
@@ -193,7 +220,7 @@ const guardSit: PresetFn = ({ time }) => {
   const perk = cycle < 0.12 ? Math.sin((cycle / 0.12) * Math.PI) * 0.08 : 0;
   return {
     position: [0, breathe, 0],
-    rotation: [-perk * 0.5, sway, 0],
+    rotation: [-perk * 0.5, faceCamera(sway), 0],
     scale: [1, 1 + breathe + perk, 1],
   };
 };
