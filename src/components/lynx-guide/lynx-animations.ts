@@ -33,29 +33,31 @@ export interface PresetContext {
 
 export type PresetFn = (ctx: PresetContext) => LynxTransform;
 
-// 1. Welcome — two playful hops in, then breathing + head wiggle.
+// Keep face visible: clamp yaw so the back never faces the camera.
+// Camera is at +Z; yaw=0 faces camera. Allow ~±60° (3/4 view) max.
+const MAX_YAW = Math.PI / 3;
+const faceCamera = (yaw: number) => Math.max(-MAX_YAW, Math.min(MAX_YAW, yaw));
+
+// 1. Welcome — two playful hops in, then head tilt + breathing, always facing camera.
 const entranceSit: PresetFn = ({ time }) => {
   const enter = clamp01(time / 0.6);
   const popIn = easeOutElastic(enter);
-  // Two bounces: 0..0.45s first hop, 0.45..0.85s smaller hop
   let y = 0;
   let stretchY = 1;
   if (time < 0.45) {
     const t = time / 0.45;
     y = -0.5 + Math.sin(t * Math.PI) * 0.7;
-    stretchY = 1 + Math.sin(t * Math.PI) * 0.15; // stretch in air
+    stretchY = 1 + Math.sin(t * Math.PI) * 0.15;
   } else if (time < 0.85) {
     const t = (time - 0.45) / 0.4;
     y = Math.sin(t * Math.PI) * 0.35;
     stretchY = 1 + Math.sin(t * Math.PI) * 0.08;
   } else {
-    // breathing
     stretchY = 1 + Math.sin((time - 0.85) * 3.2) * 0.05;
   }
-  // Head wiggle after landing
-  const wiggle = time > 0.85 ? Math.sin((time - 0.85) * 2.4) * 0.18 : 0;
+  const wiggle = time > 0.85 ? Math.sin((time - 0.85) * 2.4) * 0.35 : 0;
+  const tilt = time > 0.85 ? Math.sin((time - 0.85) * 1.7) * 0.12 : 0;
   const breathe = time > 0.85 ? Math.sin((time - 0.85) * 1.8) * 0.04 : 0;
-  // Landing squash
   const landImpulse =
     time > 0.4 && time < 0.55 ? Math.sin(((time - 0.4) / 0.15) * Math.PI) : 0;
   const sx = popIn * (1 + landImpulse * 0.15);
@@ -63,7 +65,7 @@ const entranceSit: PresetFn = ({ time }) => {
   const sz = popIn * (1 + landImpulse * 0.15);
   return {
     position: [0, y + breathe, 0],
-    rotation: [0, wiggle, 0],
+    rotation: [0, faceCamera(wiggle), tilt],
     scale: [sx, sy, sz],
   };
 };
